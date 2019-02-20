@@ -22,9 +22,11 @@
 #include <linux/irq.h>
 #include <media/rc-core.h>
 #include <media/gpio-ir-recv.h>
+#include <linux/leds.h>
 
 #define GPIO_IR_DRIVER_NAME	"gpio-rc-recv"
 #define GPIO_IR_DEVICE_NAME	"gpio_ir_recv"
+static struct led_trigger *led_feedback;
 
 struct gpio_rc_dev {
 	struct rc_dev *rcdev;
@@ -78,6 +80,7 @@ static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
 	int gval;
 	int rc = 0;
 	enum raw_event_type type = IR_SPACE;
+	led_trigger_event(led_feedback, LED_FULL);
 
 	gval = gpio_get_value(gpio_dev->gpio_nr);
 
@@ -100,6 +103,7 @@ static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
 	ir_raw_event_handle(gpio_dev->rcdev);
 
 err_get_value:
+	led_trigger_event(led_feedback, LED_OFF);
 	return IRQ_HANDLED;
 }
 
@@ -197,6 +201,7 @@ static int gpio_ir_recv_probe(struct platform_device *pdev)
 	if (rc < 0)
 		goto err_request_irq;
 
+	led_trigger_register_simple("gpio-rc-feedback", &led_feedback);
 	return 0;
 
 err_request_irq:
@@ -221,6 +226,7 @@ static int gpio_ir_recv_remove(struct platform_device *pdev)
 	rc_unregister_device(gpio_dev->rcdev);
 	gpio_free(gpio_dev->gpio_nr);
 	kfree(gpio_dev);
+	led_trigger_unregister_simple(led_feedback);
 	return 0;
 }
 
